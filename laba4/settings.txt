@@ -1,0 +1,11 @@
+add sum
+div  / 
+rem %
+xor <>
+input in
+not minus
+output print
+= ->
+xor <>
+left=
+(op)

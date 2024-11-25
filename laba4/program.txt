@@ -1,0 +1,8 @@
+in(va1);
+in(va2);
+in(va3);
+va4 -> 20;
+print(minus va4);
+print(1 sum va1 sum va2 sum 5);
+va6 -> 2 pow 4;
+print(va6);
