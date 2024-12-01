@@ -65,10 +65,23 @@ char *readStringToSemicolon(FILE *file, int *error) {
 	}
 	char ch;
 	while (fscanf(file, "%c", &ch) == 1 && ch != stop_symb) {
+
 		if (ch == '['){
 			char tm = '1';
-			while (tm != ']' && tm != EOF){
+			int count_open = 1;
+			int couunt_close = 0;
+			while (count_open != couunt_close && tm != EOF){
 				tm = getc(file);
+				if (tm == '['){
+					count_open++;
+				}
+				if (tm == ']'){
+					couunt_close++;
+				}
+			}
+			if (tm == EOF){
+				*error = 2;
+				return NULL;
 			}
 			continue;
 		}
@@ -140,6 +153,9 @@ char *removeComment(char *str) {
 
 bool isValidVariableName(const char *name) {
 	if (name == NULL || *name == '\0') {
+		return false;
+	}
+	if (strchr(name, '_') == NULL){
 		return false;
 	}
 	if (isdigit(*name)) {

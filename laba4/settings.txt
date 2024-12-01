@@ -1,10 +1,10 @@
-add sum
-div  / 
+add +
+div /
 rem %
-xor <>
 input in
 not minus
 output print
+or |
 = ->
 xor <>
 left=

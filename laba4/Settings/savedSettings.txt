@@ -1,0 +1,15 @@
+(op)
+left=
+xor <>
+input in
+not minus
+sub sub
+div /
+pow pow
+= ->
+and and
+or |
+output print
+rem %
+add +
+mult mult

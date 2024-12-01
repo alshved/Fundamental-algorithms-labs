@@ -54,29 +54,35 @@ char* uintToString(unsigned long long num, int base) {
 	return str;
 }
 
-int parseBase(int argc, char** argv, bool debug, unsigned long* base_assign, unsigned long* base_input,
+int parseBase(int start, int argc, char** argv, bool debug, unsigned long* base_assign, unsigned long* base_input,
               unsigned long* base_output) {
 	char* endptr;
 	if (debug) argc--;
-	if (argc - 3 > 0) {
-		*base_assign = strtoul(argv[3], &endptr, 10);
+	if (argc - start > 0) {
+		*base_assign = strtoul(argv[start], &endptr, 10);
 		if (*endptr != '\0' || !validateBase(*base_assign)) {
-			return 1;
+			return 0;
 		}
+	} else {
+		return 0;
 	}
-	if (argc - 4 > 0) {
-		*base_input = strtoul(argv[4], &endptr, 10);
+	if (argc - start - 1 > 0) {
+		*base_input = strtoul(argv[start + 1], &endptr, 10);
 		if (*endptr != '\0' || !validateBase(*base_input)) {
 			return 1;
 		}
+	} else {
+		return 1;
 	}
-	if (argc - 5 > 0) {
-		*base_output = strtoul(argv[5], &endptr, 10);
+	if (argc - start - 2 > 0) {
+		*base_output = strtoul(argv[start + 2], &endptr, 10);
 		if (*endptr != '\0' || !validateBase(*base_output)) {
-			return 1;
+			return 2;
 		}
+	} else {
+		return 2;
 	}
-	return 0;
+	return 3;
 }
 
 unsigned long long calculateCommandEright(HashTable* synonym, HashTable* rev_synonym, trieNode* root, char* command,
@@ -231,7 +237,7 @@ unsigned long long calculateUnOPEright(HashTable* synonym, HashTable* rev_synony
 	free(temp);
 	if (strcmp(op, search(synonym, "input")) == 0) {
 		char* read = readStringWithSpace(stdin);
-		if (!isValidNumber(read, base_input)) {
+		if (!isValidNumber(read, base_input) || !isValidVariableName(var)) {
 			free(var);
 			free(read);
 			free(op);
@@ -418,7 +424,7 @@ unsigned long long calculateUnOPEleft(HashTable* synonym, HashTable* rev_synonym
 	}
 	if (strcmp(op, search(synonym, "input")) == 0) {
 		char* read = readStringWithSpace(stdin);
-		if (!isValidNumber(read, base_input)) {
+		if (!isValidNumber(read, base_input) || !isValidVariableName(var)) {
 			free(var);
 			free(read);
 			free(op);
@@ -483,7 +489,7 @@ unsigned long long calculateUnOPEmiddle(HashTable* synonym, HashTable* rev_synon
 	}
 	if (strcmp(op, search(synonym, "input")) == 0) {
 		char* read = readStringWithSpace(stdin);
-		if (!isValidNumber(read, base_input)) {
+		if (!isValidNumber(read, base_input) || !isValidVariableName(var)) {
 			free(op);
 			free(var);
 			free(read);
@@ -831,49 +837,90 @@ int breakPointMenu(HashTable* synonym, HashTable* rev_synonym, trieNode* root) {
 	}
 }
 
+int printHashTableToFile(HashTable* table1, HashTable* table2, const char* filename, DirectionOfSaving dir_s,
+                         DirectionOfExecution dir_e) {
+	FILE* fp = fopen(filename, "w");
+	if (fp == NULL) {
+		fprintf(stderr, "Error opening file: %s\n", filename);
+		return 1;
+	}
+	if (dir_e == ERIGHT) {
+		fprintf(fp, "op()\n");
+	}
+	if (dir_e == ELEFT) {
+		fprintf(fp, "()op\n");
+	}
+	if (dir_e == EMIDDLE) {
+		fprintf(fp, "(op)\n");
+	}
+	if (dir_s == DLEFT) {
+		fprintf(fp, "left=\n");
+	}
+	if (dir_s == DRIGHT) {
+		fprintf(fp, "right=\n");
+	}
+
+	for (int i = 0; i < TABLE_SIZE; i++) {
+		Node* current = table1->table[i];
+		while (current != NULL) {
+			char* find = search(table2, current->value);
+			if (find[0] != ';') {
+				fprintf(fp, "%s %s\n", current->key, current->value);
+			}
+			current = current->next;
+		}
+	}
+	fclose(fp);
+	return 0;
+}
+
 int main(int argc, char** argv) {
 	unsigned long base_assign = 10;
 	unsigned long base_input = 10;
 	unsigned long base_output = 10;
 	bool debug = false;
-	if (argc < 3) {
+	if (argc < 2) {
 		printf("Few arguments.\n");
+		return 1;
+	}
+	FILE* program = fopen(argv[1], "r");
+	if (!program) {
+		printf("Error reading file with the text of the program.\n");
 		return 1;
 	}
 	if (strcmp(argv[argc - 1], "--debug") == 0 || strcmp(argv[argc - 1], "-d") == 0 ||
 	    strcmp(argv[argc - 1], "/debug") == 0) {
 		debug = true;
 	}
-
-	char resolved_path1[PATH_MAX];
-    char resolved_path2[PATH_MAX];
-    if (realpath(argv[1], resolved_path1) == NULL) {
-        perror("Path resolution error for file1");
-        return 1;
-    }
-    if (realpath(argv[2], resolved_path2) == NULL) {
-        perror("Path resolution error for file2");
-        return 1;
-    }
-    if (strcmp(resolved_path1, resolved_path2) == 0) {
-        printf("The same file.\n");
-		return 1;
-    }
-	
-
-	if (parseBase(argc, argv, debug, &base_assign, &base_input, &base_output) != 0) {
-		printf("Wrong base in arguments.\n");
-		return 1;
-	}
-	FILE* settings = fopen(argv[1], "r");
-	if (!settings) {
-		printf("Error reading file with the settings.\n");
-		return 1;
-	}
-	FILE* program = fopen(argv[2], "r");
-	if (!program) {
-		fclose(settings);
-		printf("Error reading file with the text of the program.\n");
+	int count_args = (debug) ? argc - 3 : argc - 2;
+	bool builtin_settings = false;
+	FILE* settings = NULL;
+	if (count_args > 0) {
+		settings = fopen(argv[2], "r");
+		if (!settings) {
+			settings = fopen("Settings/savedSettings.txt", "r");
+			builtin_settings = true;
+			if (parseBase(2, argc, argv, debug, &base_assign, &base_input, &base_output) != count_args) {
+				printf("Wrong arguments.\n");
+				fclose(program);
+				return 1;
+			}
+		} else {
+			if (parseBase(3, argc, argv, debug, &base_assign, &base_input, &base_output) != count_args - 1) {
+				printf("Wrong arguments.\n");
+				fclose(program);
+				return 1;
+			}
+		}
+	} else {
+		builtin_settings = true;
+		settings = fopen("Settings/savedSettings.txt", "r");
+		if (!settings) {
+			printf("Error opening savedSettings.txt\n");
+			perror("fopen");
+			fclose(program);
+			return 1;
+		}
 	}
 
 	HashTable* synonyms = createHashTable();
@@ -890,6 +937,16 @@ int main(int argc, char** argv) {
 		destroyHashTable(rev_synonyms);
 		return 1;
 	}
+	if (!builtin_settings && printHashTableToFile(synonyms, rev_synonyms, "Settings/savedSettings.txt",
+	direction_of_saving,
+	                         direction_of_execution) != 0) {
+		printf("Error writing file with the settings.\n");
+		fclose(settings);
+		fclose(program);
+		destroyHashTable(synonyms);
+		destroyHashTable(rev_synonyms);
+		return 1;
+	}
 	fclose(settings);
 	trieNode* root = createNode();
 	char* line;
@@ -898,6 +955,7 @@ int main(int argc, char** argv) {
 		line = readStringToSemicolon(program, &error);
 		if (error) {
 			if (error == 1) printf("Error: You somewhere forgot ;.\n");
+			if (error == 2) printf("You don't close comments.\n");
 			free(line);
 			destroyHashTable(synonyms);
 			destroyHashTable(rev_synonyms);

@@ -1,8 +1,8 @@
-in(va1);
-in(va2);
-in(va3);
-va4 -> 20;
-print(minus va4);
-print(1 sum va1 sum va2 sum 5);
-va6 -> 2 pow 4;
-print(va6);
+in(va_1);
+in(va_2);
+in(va_3);
+v_a5 -> va_1 + va_2;[
+prin[t(v_a5);]
+#BREAKPOINT
+print(20 and[[pow]] 1);]
+print(230);
